@@ -1,7 +1,7 @@
 mod prop;
 mod extensions;
-mod library;
 mod component;
+mod services;
 
 use wasmer::{wat2wasm, LazyInit, Instance, Module, Store, NativeFunc, ValueType, Memory, WasmerEnv};
 
@@ -29,7 +29,7 @@ impl extensions::field::FieldProvider for Tmp {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>>{
-  let wasm_bytes = wat2wasm(include_bytes!("module.wat"))?;
+  let wasm_bytes = wat2wasm(include_bytes!("../../module/target/wasm32-unknown-unknown/release/korriban_module.wasm"))?;
   
   let store = Store::default();
 
@@ -39,12 +39,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>>{
 
   let instance = Instance::new(&module, &import_obj)?;
 
-  instance.exports.get_native_function::<(), ()>("init")?.call()?;
-
-  let sum: NativeFunc<(i32, i32), i32> = instance.exports.get_native_function("sum")?;
+  let sum: NativeFunc<(), f32> = instance.exports.get_native_function("do_thing")?;
   let start = Instant::now();
   for x in 0..1000 {
-    let results = sum.call(x, 1)?;
+    let results = sum.call()?;
   }
   let dest = Instant::now().duration_since(start);
   println!("Executed call 1000 times in {:?}", dest);

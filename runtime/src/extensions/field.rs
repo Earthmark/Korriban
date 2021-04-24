@@ -1,5 +1,7 @@
 use wasmer::{imports, ImportObject, WasmPtr, ValueType, Function, Store, WasmerEnv, Memory, LazyInit};
 
+use glam::Vec3;
+
 pub trait FieldProvider : WasmerEnv + Clone {
     fn get<Value: Copy + ValueType + Default>(&self, index: u32) -> Value;
     fn set<Value: Copy + ValueType>(&self, index: u32, value: Value);
@@ -10,6 +12,20 @@ struct Env<TFieldProvider> where TFieldProvider : FieldProvider {
     #[wasmer(export)]
     pub memory: LazyInit<Memory>,
     pub props: TFieldProvider,
+}
+
+trait WrappedValueType : ValueType{
+
+}
+
+#[derive(Copy, Clone, Default)]
+#[repr(C)]
+struct V3W {
+    v: Vec3
+}
+
+unsafe impl ValueType for V3W {
+
 }
 
 pub fn make_exports(store: &Store, props: impl FieldProvider + 'static) -> ImportObject {
@@ -23,6 +39,10 @@ pub fn make_exports(store: &Store, props: impl FieldProvider + 'static) -> Impor
             "get_u32" => Function::new_native_with_env(store, env.clone(), Env::field_get::<u32>),
             "get_i64" => Function::new_native_with_env(store, env.clone(), Env::field_get::<i64>),
             "get_u64" => Function::new_native_with_env(store, env.clone(), Env::field_get::<u64>),
+            "get_f32" => Function::new_native_with_env(store, env.clone(), Env::field_get::<f32>),
+            "get_f64" => Function::new_native_with_env(store, env.clone(), Env::field_get::<f64>),
+
+            "get_v3_f32" => Function::new_native_with_env(store, env.clone(), Env::field_get::<V3W>),
 
             "set_i32" => Function::new_native_with_env(store, env.clone(), Env::field_set::<i32>),
             "set_u32" => Function::new_native_with_env(store, env.clone(), Env::field_set::<u32>),

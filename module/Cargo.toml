@@ -1,0 +1,19 @@
+[package]
+name = "korriban-module"
+version = "0.1.0"
+authors = ["Daniel Miller (Earthmark) <earthmark.miller@gmail.com>"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wee_alloc = "*"
+
+glam = "*"
+
+korriban-elem = { path = "../interface" }
+
+[profile.release]
+# Tell `rustc` to optimize for small code size.
+opt-level = "s"

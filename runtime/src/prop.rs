@@ -1,7 +1,5 @@
 use std::{marker::PhantomData, usize};
 
-use glam::{Vec2, Vec3, Vec4, Mat2, Mat3, Mat4, Quat, DVec2, DVec3, DVec4, DMat2, DMat3, DMat4, DQuat, IVec2, IVec3, IVec4, UVec2, UVec3, UVec4, BVec2, BVec3, BVec4};
-
 type Key = usize;
 
 #[macro_export]
@@ -39,7 +37,6 @@ pub trait Update {
 macro_rules! make_props {
     (struct $name:ident {
         type Prop = $prop_val_name:ident;
-        iters = [$($iter_type:ty,)*],
         $($field_name:ident: $raw_type:ty,)*
     }) => {
         pub struct $name {
@@ -91,42 +88,8 @@ macro_rules! make_props {
 make_props! {
     struct PropSet {
         type Prop = PropSetVal;
-        iters = [Update,],
 
         i32_cache: i32,
-        vec2_i32_cache: IVec2,
-        vec3_i32_cache: IVec3,
-        vec4_i32_cache: IVec4,
-
-        u32_cache: u32,
-        vec2_u32_cache: UVec2,
-        vec3_u32_cache: UVec3,
-        vec4_u32_cache: UVec4,
-
-        f32_cache: f32,
-        vec2_f32_cache: Vec2,
-        vec3_f32_cache: Vec3,
-        vec4_f32_cache: Vec4,
-        mat2_f32_cache: Mat2,
-        mat3_f32_cache: Mat3,
-        mat4_f32_cache: Mat4,
-        quat_f32_cache: Quat,
-
-        f64_cache: f64,
-        vec2_f64_cache: DVec2,
-        vec3_f64_cache: DVec3,
-        vec4_f64_cache: DVec4,
-        mat2_f64_cache: DMat2,
-        mat3_f64_cache: DMat3,
-        mat4_f64_cache: DMat4,
-        quat_f64_cache: DQuat,
-
-        bool_cache: bool,
-        vec2_bool_cache: BVec2,
-        vec3_bool_cache: BVec3,
-        vec4_bool_cache: BVec4,
-
-        string_cache: String,
     }
 }
 
@@ -175,23 +138,16 @@ mod tests {
         println!("Cache i8 is {} bytes", std::mem::size_of::<VecCache<i8>>());
         println!("i32 is {} bytes", std::mem::size_of::<i32>());
         println!("bool is {} bytes", std::mem::size_of::<bool>());
-        println!("vec2 bool is {} bytes", std::mem::size_of::<BVec2>());
     }
 
     #[test]
     fn bench_add_two_2() {
         let mut set = PropSet::new();
         let key2 = set.allocate::<i32>(123);
-        let key4 = set.allocate::<String>(String::from("Tacos"));
-        let key = set.allocate::<IVec3>(IVec3::new(1, 2,3));
         *set.get_mut(&key2).unwrap() = 2;
         (
             set.get(&key2).unwrap(),
             set.get(&key2).unwrap(),
-            set.get(&key4).unwrap(),
-            set.get(&key).unwrap(),
-            set.get(&key).unwrap(),
-            set.get(&key).unwrap(),
         );
     }
 }
