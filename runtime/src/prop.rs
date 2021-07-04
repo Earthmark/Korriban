@@ -24,14 +24,9 @@ impl<TType> CacheKey<TType> {
 }
 
 pub trait Cache<TValue> {
-    fn allocate(&mut self, val: TValue) -> CacheKey<TValue>;
-    fn get_mut(&mut self, index: &CacheKey<TValue>) -> Option<&mut TValue>;
-    fn get(&self, index: &CacheKey<TValue>) -> Option<&TValue>;
-}
-
-pub trait Update {
-    fn order(&self) -> u32;
-    fn update(&self, props: &mut PropSet);
+    fn allocate(&mut self, val: TValue) -> Key;
+    fn get_mut(&mut self, index: Key) -> Option<&mut TValue>;
+    fn get(&self, index: Key) -> Option<&TValue>;
 }
 
 macro_rules! make_props {
@@ -39,6 +34,7 @@ macro_rules! make_props {
         type Prop = $prop_val_name:ident;
         $($field_name:ident: $raw_type:ty,)*
     }) => {
+        #[derive(Clone)]
         pub struct $name {
             $($field_name: VecCache<$raw_type>,)*
         }
@@ -56,17 +52,17 @@ macro_rules! make_props {
             }
 
             #[inline]
-            pub fn allocate<T: $prop_val_name + 'static>(&mut self, val: T) ->  CacheKey<T> {
+            pub fn allocate<T: $prop_val_name + 'static>(&mut self, val: T) -> Key {
                 T::get_cache_mut(self).allocate(val)
             }
 
             #[inline]
-            pub fn get_mut<T:$prop_val_name + 'static>(&mut self, index: &CacheKey<T>) -> Option<&mut T> {
+            pub fn get_mut<T:$prop_val_name + 'static>(&mut self, index: Key) -> Option<&mut T> {
                 T::get_cache_mut(self).get_mut(index)
             }
 
             #[inline]
-            pub fn get<T: $prop_val_name + 'static>(&self, index: &CacheKey<T>) -> Option<&T> {
+            pub fn get<T: $prop_val_name + 'static>(&self, index: Key) -> Option<&T> {
                 T::get_cache(self).get(index)
             }
         }
@@ -90,37 +86,36 @@ make_props! {
         type Prop = PropSetVal;
 
         i32_cache: i32,
+        f32_cache: f32,
     }
 }
 
-struct VecCache<T> {
+#[derive(Clone)]
+struct VecCache<T: Clone> {
     values: Vec<T>,
 }
 
-impl<T> VecCache<T> {
+impl<T: Clone> VecCache<T> {
     fn new() -> VecCache<T> {
         VecCache { values: Vec::new() }
     }
 }
 
-impl<T> Cache<T> for VecCache<T> {
-    fn allocate(&mut self, val: T) -> CacheKey<T> {
+impl<T: Clone> Cache<T> for VecCache<T> {
+    fn allocate(&mut self, val: T) -> Key {
         let index = self.values.len();
         self.values.push(val);
-        CacheKey {
-            key: index,
-            phantom: PhantomData,
-        }
+        index
     }
 
     #[inline]
-    fn get_mut(&mut self, index: &CacheKey<T>) -> Option<&mut T> {
-        self.values.get_mut(index.key)
+    fn get_mut(&mut self, index: Key) -> Option<&mut T> {
+        self.values.get_mut(index)
     }
 
     #[inline]
-    fn get(&self, index: &CacheKey<T>) -> Option<&T> {
-        self.values.get(index.key)
+    fn get(&self, index: Key) -> Option<&T> {
+        self.values.get(index)
     }
 }
 
@@ -144,10 +139,7 @@ mod tests {
     fn bench_add_two_2() {
         let mut set = PropSet::new();
         let key2 = set.allocate::<i32>(123);
-        *set.get_mut(&key2).unwrap() = 2;
-        (
-            set.get(&key2).unwrap(),
-            set.get(&key2).unwrap(),
-        );
+        *set.get_mut::<i32>(key2).unwrap() = 2;
+        (set.get::<i32>(key2).unwrap(), set.get::<i32>(key2).unwrap());
     }
 }

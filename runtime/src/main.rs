@@ -1,51 +1,93 @@
-mod prop;
-mod extensions;
 mod component;
-mod services;
+mod extensions;
+mod field;
+mod prop;
+mod space;
 
-use wasmer::{wat2wasm, LazyInit, Instance, Module, Store, NativeFunc, ValueType, Memory, WasmerEnv};
+use wasmer::{
+    wat2wasm, Instance, LazyInit, Memory, Module, NativeFunc, Store, ValueType, WasmerEnv,
+};
 
+use crate::prop::{Cache, PropSet};
+use std::sync::{Arc, RwLock};
 use std::time::Instant;
-use std::sync::Arc;
-use crate::prop::PropSet;
 
 #[derive(WasmerEnv, Clone)]
 struct State {
-  #[wasmer(export)]
-  memory: LazyInit<Memory>,
-  props: Arc<PropSet>,
+    props: Arc<RwLock<PropSet>>,
 }
 
-#[derive(WasmerEnv, Clone)]
-struct Tmp {
+impl extensions::field::SingleFieldProvider<i32> for State {
+    fn get(&self, index: u32) -> i32 {
+        if let Ok(props) = self.props.read() {
+            if let Some(target) = props.get(index as usize) {
+                return *target;
+            }
+        }
+        i32::default()
+    }
+
+    fn set(&self, index: u32, value: i32) {
+        if let Ok(mut props) = self.props.write() {
+            if let Some(target) = props.get_mut(index as usize) {
+                *target = value;
+            }
+        }
+    }
 }
 
-impl extensions::field::FieldProvider for Tmp {
-  fn get<Value: Copy + ValueType + Default>(&self, index: u32) -> Value {
-    Value::default()
-  }
-  fn set<Value: Copy + ValueType>(&self, index: u32, value: Value) {
-  }
+impl extensions::field::SingleFieldProvider<f32> for State {
+    fn get(&self, index: u32) -> f32 {
+        if let Ok(props) = self.props.read() {
+            if let Some(target) = props.get(index as usize) {
+                return *target;
+            }
+        }
+        f32::default()
+    }
+
+    fn set(&self, index: u32, value: f32) {
+        if let Ok(mut props) = self.props.write() {
+            if let Some(target) = props.get_mut(index as usize) {
+                *target = value;
+            }
+        }
+    }
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>>{
-  let wasm_bytes = wat2wasm(include_bytes!("../../module/target/wasm32-unknown-unknown/release/korriban_module.wasm"))?;
-  
-  let store = Store::default();
+impl extensions::field::FieldProvider for State {}
 
-  let module = Module::new(&store, wasm_bytes)?;
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let wasm_bytes = wat2wasm(include_bytes!("../module.wat"))?;
 
-  let import_obj = extensions::field::make_exports(&store, Tmp{});
+    let store = Store::default();
 
-  let instance = Instance::new(&module, &import_obj)?;
+    let module = Module::new(&store, wasm_bytes)?;
 
-  let sum: NativeFunc<(), f32> = instance.exports.get_native_function("do_thing")?;
-  let start = Instant::now();
-  for x in 0..1000 {
-    let results = sum.call()?;
-  }
-  let dest = Instant::now().duration_since(start);
-  println!("Executed call 1000 times in {:?}", dest);
+    let state = State {
+        props: Arc::new(RwLock::new(PropSet::new())),
+    };
+    let import_obj = extensions::field::make_exports(&store, state.clone());
 
-  Ok(())
+    if let Ok(mut props) = state.props.write() {
+        props.allocate::<f32>(0.1);
+    }
+
+    let instance = Instance::new(&module, &import_obj)?;
+
+    let sum: NativeFunc<(), f32> = instance.exports.get_native_function("exec")?;
+    let start = Instant::now();
+    for x in 0..1000 {
+        if let Ok(mut props) = state.props.write() {
+            if let Some(field) = props.get_mut::<f32>(0) {
+                *field = x as f32;
+            }
+        }
+
+        let results = sum.call()?;
+    }
+    let dest = Instant::now().duration_since(start);
+    println!("Executed call 1000 times in {:?}", dest);
+
+    Ok(())
 }
